@@ -25,7 +25,7 @@ This step generates a .dat file that can be used by g_reff
 
 The second step is the calculation of the NOEs from the ensemble and its comparison with the experimental data 
 
-
+python2.7 g_reff -r NOE_converted.dat -p trajectory.pdb 
 
 When using the g_reff and NOEconverter.py for publication please cite:
 
