@@ -1,3 +1,10 @@
+Computational Biology Laboratory, Danish Cancer Society Research Center, Strandboulevarden 49, 2100, Copenhagen, Denmark
+
+This repository includes scripts to back-calculate NOEs from biomolecular ensembles, such as the ones obtained by a MD simulation, as well as to compare to a set of experimental ones.
+It contains two python scripts:
+1.  NOEconverter.py which helps in the creation of the right file format for the experimental data
+2. g_reff to carry out the calculation of NOEs from the ensemble, as well as to compare with the experimental NOEs. 
+
 usage: g_reff [-h] -r NOES [-p PDB]
 
 Calculate Reff on selected atom classes from an MD simulation
@@ -6,3 +13,14 @@ optional arguments:
   -h, --help            show this help message and exit
   -r NOES, --reff NOES  noes file
   -p PDB, --pdb PDB     pdb file
+
+EXAMPLE
+
+An example is provided in this repository with a short trajectory to test the tool.
+
+
+When using the g_reff and NOEconverter.py for publication please cite:
+
+Matteo Lambrughi, Matteo Tiberti, Maria Francesca Allega, Valentina Sora, Mads Nygaard, Agota Toth, Juan Salamanca Viloria, Emmanuelle Bignon, Elena Papaleo*, Analyzing biomolecular ensembles, in preparation.
+
+
