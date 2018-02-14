@@ -17,6 +17,14 @@ optional arguments:
 EXAMPLE
 
 An example is provided in this repository with a short trajectory to test the tool.
+The first step is the conversion to the proper NOE format using as input: i) the first frame of the ensemble, for example First_frame_chain_A.pdb, as a reference pdb file; ii) the file with the experimental NOEs from the BMRB database; iii) a conversion table for the atom name compatible with the force field used in the simulation (in the example CHARMM) 
+
+python NOEconverter.py -pdb First_frame_chain_A.pdb -noe BMRB_NOE.mr -c AAtable_new_CHARMM.par
+
+This step generates a .dat file that can be used by g_reff
+
+The second step is the calculation of the NOEs from the ensemble and its comparison with the experimental data 
+
 
 
 When using the g_reff and NOEconverter.py for publication please cite:

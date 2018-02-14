@@ -1,0 +1,151 @@
+#    Copyright (C) 2018 Matteo Lambrughi, Matteo Tiberti, Maria Francesca Allega, Valentina Sora, Mads Nygaard, Agota Toth, Juan Salamanca Viloria, Emmanuelle Bignon, Elena Papaleo <elenap@cancer.dk>, Computational Biology Laboratory, Danish Cancer Society Research Center, 2100, Copenhagen, Denmark
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#!/usr/bin/python
+
+__authors__ = "Mads Nygaard"
+
+import MDAnalysis as mda
+import numpy as np
+import sys
+
+
+def do_cmvmat(uni, classes, exponent=6.0):
+    pairs = []
+    atoms = []
+    for i in classes: 
+        pairs.extend(i)
+    for i in pairs: 
+        atoms.extend(i)
+    resnames, atomnames, chain = zip(*list(set(atoms)))
+    idxs = []
+    chosenselections = []
+    for i in atoms:
+        chosenselections.append(uni.select_atoms("resid %d and name %s and segid %s " % (i[0], i[1], i[2])))
+    for i in chosenselections:
+        assert len(i) == 1, "ERROR: Atom groups contained more than 1 atoms. Something fishy is going on."
+    idxs = atoms
+    numframes = uni.trajectory.n_frames
+    a = 0
+    cumvmat = np.zeros((len(chosenselections), len(chosenselections)))
+    for ts in uni.trajectory:
+        sys.stderr.write("\rNow analyzing: frame %d / %d (%3.1f%%)" % (a+1, numframes, float(a)/float(numframes)*100.0))
+        sys.stdout.flush()
+        a += 1
+        coms = np.zeros([len(chosenselections), 3])
+        for j in range(len(chosenselections)):
+            coms[j, 0], coms[j, 1], coms[j, 2] = chosenselections[j].center_of_mass()
+        for j in pairs:
+            idx1 = idxs.index(j[0])
+            idx2 = idxs.index(j[1])
+            dist = np.linalg.norm(coms[idx1] - coms[idx2])
+            cumvmat[idx1, idx2] += dist**(-float(exponent))
+            cumvmat[idx2, idx1] += dist**(-float(exponent))
+    sys.stderr.write("\n")
+    return (idxs, cumvmat)
+
+
+def parse_noes(fname):
+    lines = open(fname, 'r').readlines()
+    for line in lines:
+        if line.startswith('#'):
+            lines.remove(line)
+    class_pairs = []
+    class_expvals = []
+    this_class = []
+    # first line: ensure good behaviour
+    # class: [(r1, name1, r2, name2),(...),(...)]
+    # expvals: [(avg, min, max),(...)]
+    tmp = lines[0].strip().split()
+    this_class.append(((int(tmp[0]), tmp[1], tmp[2]), (int(tmp[3]), tmp[4], tmp[5])))
+    class_expvals.append((float(tmp[7]), float(tmp[8]), float(tmp[9])))
+    curclass = tmp[6]
+    for line in lines[1:]:
+        tmp = line.strip().split()
+        if tmp[6] == curclass:  # same class
+            try:
+                this_class.append(((int(tmp[0]), tmp[1], tmp[2]), (int(tmp[3]), tmp[4], tmp[5])))
+            except ValueError:
+                print "WARNING: %s %s %s %s not found" % (int(tmp[0]), tmp[1], int(tmp[2]), tmp[3])
+                pass
+        else:  # if class OR residues have changed
+            # reinitialize for new class
+            class_pairs.append(this_class)
+            this_class = []
+            curclass = tmp[6]
+            try:
+                class_expvals.append((float(tmp[7]), float(tmp[8]), float(tmp[9])))
+            except:
+                print "WARNING: class %s has missing experimental values" % curclass
+                class_expvals.append((0.0, 0.0, 0.0))
+                pass
+            try:
+                this_class.append(((int(tmp[0]), tmp[1], tmp[2]), (int(tmp[3]), tmp[4], tmp[5])))
+            except ValueError:
+                print "WARNING: %s %s %s %s not found" % (int(tmp[0]), tmp[1], int(tmp[2]), tmp[3])
+                pass
+    class_pairs.append(this_class)
+    assert len(class_pairs) == len(class_expvals), "ERROR: experimental values do not coincide with classes"
+    sys.stderr.write("Done! %d classes found " % len(class_expvals))
+    return class_pairs, class_expvals
+
+
+def calc_reffs(uni, idxs, cmvmat, dclasses, expvals, exponent=6.0):    
+    out = []
+    for i in range(len(dclasses)):        
+        curvals = []
+        for pair in dclasses[i]: 
+            curvals.append(cmvmat[idxs.index(pair[0]), idxs.index(pair[1])])
+        out.append([i, expvals[i][0], (np.average(curvals)/float(uni.trajectory.n_frames))**(-1.0/float(exponent)), expvals[i][1], expvals[i][2]])
+    return out
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description='Calculate Reff on selected atom classes from an MD simulation')
+    parser.add_argument("-r", "--reff", dest="noes", help="noes file", required=True)
+    parser.add_argument("-p", "--pdb", dest="pdb", help="pdb file")
+
+    args = parser.parse_args()
+    pdb = args.pdb
+    gro = args.gro
+    xtc = args.xtc
+    noes = args.noes
+    
+    sys.stderr.write("Loading trj . . "),
+    uni = mda.Universe(pdb)
+    sys.stderr.write("Done! Trajectory contains %d atoms, %d residues and %d frames\n" % (len(uni.atoms), len(uni.residues), uni.trajectory.n_frames))
+    sys.stderr.write("Parsing noes . . . ")
+    dclasses, expvals = parse_noes(noes) 
+    sys.stderr.write("Done! Found %d classes\n" % len(expvals))
+    idxs, cmvmat = do_cmvmat(uni, dclasses)
+    vals = calc_reffs(uni, idxs, cmvmat, dclasses, expvals)
+
+    print "#class\texp\tmd\tdelta\texpmin\texpmax"
+    for i in vals:
+    # out.append([i, expvals[i][0], (np.average(curvals)/float(uni.trajectory.numframes))**(-1.0/float(exponent)), expvals[i][1],expvals[i][2]])
+    # 0 class id
+    # 1 exp
+    # 2 md
+    # 3 min
+    # 4 max
+        if i[2] < i[1]-i[3]:
+            print "%d\t%3.3f\t%3.3f\t%3.3f\t%3.3f\t%3.3f\t*" % (i[0], i[1], i[2], i[2]-(i[1]-i[3]), i[3], i[4])
+        elif i[2] > i[1]+i[4]:   
+            print "%d\t%3.3f\t%3.3f\t%3.3f\t%3.3f\t%3.3f\t*" % (i[0], i[1], i[2], i[2]-(i[1]+i[4]), i[3], i[4])
+        else:                                              # class exp   md    delta  expmin expmax
+            print "%d\t%3.3f\t%3.3f\t%3.3f\t%3.3f\t%3.3f" % (i[0], i[1], i[2], 0.0, i[3], i[4])
+
+    
+    
+    
