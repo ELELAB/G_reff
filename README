@@ -1,0 +1,8 @@
+usage: g_reff [-h] -r NOES [-p PDB]
+
+Calculate Reff on selected atom classes from an MD simulation
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -r NOES, --reff NOES  noes file
+  -p PDB, --pdb PDB     pdb file
