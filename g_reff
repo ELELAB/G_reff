@@ -118,8 +118,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     pdb = args.pdb
-    gro = args.gro
-    xtc = args.xtc
     noes = args.noes
     
     sys.stderr.write("Loading trj . . "),
